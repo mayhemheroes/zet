@@ -1,4 +1,3 @@
-image: ysthakur/zet-fuzz:latest
 project: zet
 target: fuzz
 duration: 90
