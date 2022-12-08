@@ -1,0 +1,8 @@
+image: ysthakur/zet-fuzz:latest
+project: zet
+target: fuzz
+duration: 90
+
+cmds:
+  - cmd: "/zet/fuzz/target/x86_64-unknown-linux-gnu/release/fuzz"
+    libfuzzer: true

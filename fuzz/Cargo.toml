@@ -1,0 +1,29 @@
+[package]
+name = "zet-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1", features = ["derive"] }
+assert_fs = "1.0.3"
+libfuzzer-sys = "0.4"
+
+[dependencies.zet]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "fuzz"
+path = "fuzz_targets/fuzz.rs"
+test = false
+doc = false
