@@ -2,10 +2,7 @@
 
 extern crate core;
 
-use std::path::PathBuf;
-
 use arbitrary::{Arbitrary, Unstructured};
-use assert_fs::{prelude::*, TempDir};
 use libfuzzer_sys::fuzz_target;
 
 use zet::args::OpName;
@@ -29,22 +26,14 @@ fn arbitrary_op(u: &mut Unstructured<'_>) -> arbitrary::Result<OpName> {
     })
 }
 
-// todo reuse the calc function inside operations::test instead of copying it
 fn calc(operation: OpName, operands: Vec<String>) -> String {
     let first = operands[0].as_bytes();
-    let remaining = operands[1..].iter();
-
-    let temp_dir = TempDir::new().unwrap();
-    let mut paths = Vec::new();
-    for operand in remaining {
-        let name = format!("operand{}", paths.len());
-        let op = temp_dir.child(name);
-        op.write_str(operand).unwrap();
-        paths.push(PathBuf::from(op.path()));
-    }
+    let remaining: Vec<(String, &[u8])> = operands[1..].iter().enumerate().map(
+        |(i, text)| (format!("operand{i}"), text.as_bytes())
+    ).collect();
 
     let mut answer = Vec::new();
-    calculate(operation, first, Remaining::from(paths), &mut answer).unwrap();
+    calculate(operation, first, Remaining::from(remaining), &mut answer).unwrap();
     String::from_utf8(answer).unwrap()
 }
 
