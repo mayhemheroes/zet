@@ -1,3 +1,4 @@
+# Build step
 FROM fuzzers/cargo-fuzz:0.11.0 as builder
 
 # Put sources in /zet
@@ -6,5 +7,6 @@ WORKDIR /zet
 
 RUN cargo fuzz build
 
-ENTRYPOINT []
-CMD ["/zet/fuzz/target/x86_64-unknown-linux-gnu/release/fuzz"]
+# Packaging step
+FROM ubuntu:22.04
+COPY --from=builder /zet/fuzz/target/x86_64-unknown-linux-gnu/release/fuzz /
