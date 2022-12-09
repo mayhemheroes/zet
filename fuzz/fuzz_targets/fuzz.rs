@@ -22,15 +22,17 @@ fn arbitrary_op(u: &mut Unstructured<'_>) -> arbitrary::Result<OpName> {
         1 => OpName::Union,
         2 => OpName::Diff,
         3 => OpName::Single,
-        _ => OpName::Multiple
+        _ => OpName::Multiple,
     })
 }
 
 fn calc(operation: OpName, operands: Vec<String>) -> String {
     let first = operands[0].as_bytes();
-    let remaining: Vec<(String, &[u8])> = operands[1..].iter().enumerate().map(
-        |(i, text)| (format!("operand{i}"), text.as_bytes())
-    ).collect();
+    let remaining: Vec<(String, &[u8])> = operands[1..]
+        .iter()
+        .enumerate()
+        .map(|(i, text)| (format!("operand{i}"), text.as_bytes()))
+        .collect();
 
     let mut answer = Vec::new();
     calculate(operation, first, Remaining::from(remaining), &mut answer).unwrap();

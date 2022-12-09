@@ -18,7 +18,7 @@ use crate::set::ToZetSet;
 /// * `OpName::Single` prints the lines that occur in exactly one file, and
 /// * `OpName::Multiple` prints the lines that occur in more than one file.
 ///
-pub fn calculate<T : Read>(
+pub fn calculate<T: Read>(
     operation: OpName,
     first_operand: &[u8],
     rest: operands::Remaining<T>,
@@ -154,7 +154,8 @@ mod test {
         }
 
         let mut answer = Vec::new();
-        calculate(operation, first, operands::Remaining::from_paths(paths).unwrap(), &mut answer).unwrap();
+        calculate(operation, first, operands::Remaining::from_paths(paths).unwrap(), &mut answer)
+            .unwrap();
         String::from_utf8(answer).unwrap()
     }
 
