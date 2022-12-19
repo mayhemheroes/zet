@@ -1,13 +1,20 @@
 //! Houses the `calculate` function
 //!
-use std::io::Read;
 use std::num::NonZeroUsize;
 
 use anyhow::Result;
 
 use crate::args::OpName;
-use crate::operands;
 use crate::set::ToZetSet;
+
+/// The `calculate` function's only requirement for its second and succeeding
+/// operands is that they implement `for_byte_line`. The `LaterOperand` trait
+/// codifies that.
+pub trait LaterOperand {
+    /// The call `o.for_byte_line(|line| ...)` method calls a the given closure
+    /// for each &[u8] in `o`.
+    fn for_byte_line(self, for_each_line: impl FnMut(&[u8])) -> Result<()>;
+}
 
 /// Calculates and prints the set operation named by `op`. Each file in `files`
 /// is treated as a set of lines:
@@ -18,10 +25,10 @@ use crate::set::ToZetSet;
 /// * `OpName::Single` prints the lines that occur in exactly one file, and
 /// * `OpName::Multiple` prints the lines that occur in more than one file.
 ///
-pub fn calculate<T: Read>(
+pub fn calculate<O: LaterOperand>(
     operation: OpName,
     first_operand: &[u8],
-    rest: operands::Remaining<T>,
+    rest: impl Iterator<Item = Result<O>>,
     out: impl std::io::Write,
 ) -> Result<()> {
     match operation {
@@ -30,7 +37,7 @@ pub fn calculate<T: Read>(
         OpName::Union => {
             let mut set = first_operand.to_zet_set_with(());
             for operand in rest {
-                operand.for_byte_line(|line| {
+                operand?.for_byte_line(|line| {
                     set.insert(line, ());
                 })?;
             }
@@ -43,7 +50,7 @@ pub fn calculate<T: Read>(
         OpName::Diff => {
             let mut set = first_operand.to_zet_set_with(true);
             for operand in rest {
-                operand.for_byte_line(|line| {
+                operand?.for_byte_line(|line| {
                     if let Some(keepme) = set.get_mut(line) {
                         *keepme = false;
                     }
@@ -78,7 +85,7 @@ pub fn calculate<T: Read>(
             let mut this_cycle = BLUE;
             for operand in rest {
                 this_cycle = !this_cycle; // flip BLUE -> RED and RED -> BLUE
-                operand.for_byte_line(|line| {
+                operand?.for_byte_line(|line| {
                     if let Some(when_seen) = set.get_mut(line) {
                         *when_seen = this_cycle;
                     }
@@ -112,7 +119,7 @@ pub fn calculate<T: Read>(
                     Some(n) => this_operand_uid = n,
                     None => anyhow::bail!("Can't handle {} arguments", std::usize::MAX),
                 }
-                operand.for_byte_line(|line| match set.get_mut(line) {
+                operand?.for_byte_line(|line| match set.get_mut(line) {
                     None => set.insert(line, seen_in_this_operand),
                     Some(unique_source) => {
                         if *unique_source != seen_in_this_operand {
@@ -137,7 +144,9 @@ pub fn calculate<T: Read>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::operands;
     use assert_fs::{prelude::*, TempDir};
+    use bstr::ByteSlice;
     use std::path::PathBuf;
 
     fn calc(operation: OpName, operands: &[&[u8]]) -> String {
@@ -154,9 +163,26 @@ mod test {
         }
 
         let mut answer = Vec::new();
-        calculate(operation, first, operands::Remaining::from_paths(paths).unwrap(), &mut answer)
-            .unwrap();
+        calculate(operation, first, operands::Remaining::from(paths), &mut answer).unwrap();
+        let slow = String::from_utf8(answer).unwrap();
+        let fast = fast_calc(operation, operands);
+        assert_eq!(slow, fast);
+        slow
+    }
+
+    // Like `calc`, but does no disk I/O
+    fn fast_calc(operation: OpName, operands: &[&[u8]]) -> String {
+        let first = operands[0];
+        let mut answer = Vec::new();
+        let rest = operands[1..].iter().map(|o| Ok(*o));
+        calculate(operation, first, rest, &mut answer).unwrap();
         String::from_utf8(answer).unwrap()
+    }
+    impl LaterOperand for &[u8] {
+        fn for_byte_line(self, for_each_line: impl FnMut(&[u8])) -> Result<()> {
+            self.lines().for_each(for_each_line);
+            Ok(())
+        }
     }
 
     use self::OpName::*;
@@ -169,7 +195,7 @@ mod test {
         for op in &[Intersect, Union, Diff, Single, Multiple] {
             let result = calc(*op, &arg);
             let expected = if *op == Multiple { empty } else { uniq };
-            assert_eq!(result, *expected, "for {:?}", op);
+            assert_eq!(result, *expected, "for {op:?}");
         }
     }
     #[test]
@@ -179,10 +205,10 @@ mod test {
             b"xyz\nabc\nxy\nyz\ny\n", // Strings containing "y" (and "abc")
             b"xyz\nabc\nxz\nyz\nz\n", // Strings containing "z" (and "abc")
         ];
-        assert_eq!(calc(Union, &args), "xyz\nabc\nxy\nxz\nx\nyz\ny\nz\n", "for {:?}", Union);
-        assert_eq!(calc(Intersect, &args), "xyz\nabc\n", "for {:?}", Intersect);
-        assert_eq!(calc(Diff, &args), "x\n", "for {:?}", Diff);
-        assert_eq!(calc(Single, &args), "x\ny\nz\n", "for {:?}", Single);
-        assert_eq!(calc(Multiple, &args), "xyz\nabc\nxy\nxz\nyz\n", "for {:?}", Multiple);
+        assert_eq!(calc(Union, &args), "xyz\nabc\nxy\nxz\nx\nyz\ny\nz\n", "for {Union:?}");
+        assert_eq!(calc(Intersect, &args), "xyz\nabc\n", "for {Intersect:?}");
+        assert_eq!(calc(Diff, &args), "x\n", "for {Diff:?}");
+        assert_eq!(calc(Single, &args), "x\ny\nz\n", "for {Single:?}");
+        assert_eq!(calc(Multiple, &args), "xyz\nabc\nxy\nxz\nyz\n", "for {Multiple:?}");
     }
 }
