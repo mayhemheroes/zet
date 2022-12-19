@@ -2,12 +2,13 @@
 
 extern crate core;
 
+use anyhow::Result;
 use arbitrary::{Arbitrary, Unstructured};
+use bstr::ByteSlice;
 use libfuzzer_sys::fuzz_target;
 
 use zet::args::OpName;
-use zet::operands::Remaining;
-use zet::operations::calculate;
+use zet::operations::{calculate, LaterOperand};
 
 #[derive(Arbitrary, Debug)]
 struct FuzzInput {
@@ -26,16 +27,26 @@ fn arbitrary_op(u: &mut Unstructured<'_>) -> arbitrary::Result<OpName> {
     })
 }
 
+/** This is needed because neither LaterOperand nor &[u8] were defined in this crate */
+struct InputFile<'a> {
+    text: &'a [u8],
+}
+
+impl<'a> LaterOperand for InputFile<'a> {
+    fn for_byte_line(self, for_each_line: impl FnMut(&[u8])) -> Result<()> {
+        self.text.lines().for_each(for_each_line);
+        Ok(())
+    }
+}
+
 fn calc(operation: OpName, operands: Vec<String>) -> String {
     let first = operands[0].as_bytes();
-    let remaining: Vec<(String, &[u8])> = operands[1..]
+    let rest = operands[1..]
         .iter()
-        .enumerate()
-        .map(|(i, text)| (format!("operand{i}"), text.as_bytes()))
-        .collect();
+        .map(|text| Ok(InputFile { text: text.as_bytes() }));
 
     let mut answer = Vec::new();
-    calculate(operation, first, Remaining::from(remaining), &mut answer).unwrap();
+    calculate(operation, first, rest, &mut answer).unwrap();
     String::from_utf8(answer).unwrap()
 }
 

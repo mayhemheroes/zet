@@ -8,8 +8,10 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
+anyhow = "1.0.42"
 arbitrary = { version = "1", features = ["derive"] }
 assert_fs = "1.0.3"
+bstr = { version = "1.1.0", default-features = false, features = ["std", "alloc"] }
 libfuzzer-sys = "0.4"
 
 [dependencies.zet]
