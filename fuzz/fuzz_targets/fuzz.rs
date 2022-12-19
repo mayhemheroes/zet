@@ -14,7 +14,8 @@ use zet::operations::{calculate, LaterOperand};
 struct FuzzInput {
     #[arbitrary(with = arbitrary_op)]
     op: OpName,
-    files: Vec<String>,
+    first: String,
+    rest: Vec<String>,
 }
 
 fn arbitrary_op(u: &mut Unstructured<'_>) -> arbitrary::Result<OpName> {
@@ -27,7 +28,7 @@ fn arbitrary_op(u: &mut Unstructured<'_>) -> arbitrary::Result<OpName> {
     })
 }
 
-/** This is needed because neither LaterOperand nor &[u8] were defined in this crate */
+/** Needed because neither LaterOperand nor &[u8] were defined in this crate */
 struct InputFile<'a> {
     text: &'a [u8],
 }
@@ -39,19 +40,12 @@ impl<'a> LaterOperand for InputFile<'a> {
     }
 }
 
-fn calc(operation: OpName, operands: Vec<String>) -> String {
-    let first = operands[0].as_bytes();
-    let rest = operands[1..]
+fuzz_target!(|data: FuzzInput| {
+    let rest = data.rest
         .iter()
         .map(|text| Ok(InputFile { text: text.as_bytes() }));
 
     let mut answer = Vec::new();
-    calculate(operation, first, rest, &mut answer).unwrap();
-    String::from_utf8(answer).unwrap()
-}
-
-fuzz_target!(|data: FuzzInput| {
-    if !data.files.is_empty() {
-        calc(data.op, data.files);
-    }
+    calculate(data.op, data.first.as_bytes(), rest, &mut answer).unwrap();
+    String::from_utf8(answer).unwrap();
 });
