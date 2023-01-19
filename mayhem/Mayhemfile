@@ -1,0 +1,6 @@
+project: zet
+target: zet-fuzz
+
+cmds:
+    - cmd: ./zet-fuzz
+      libfuzzer: true
