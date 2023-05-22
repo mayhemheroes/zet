@@ -1,16 +1,18 @@
 [package]
 name = "zet-fuzz"
 version = "0.0.0"
-authors = ["Automatically generated"]
 publish = false
-edition = "2018"
+edition = "2021"
 
 [package.metadata]
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
+anyhow = "1.0.42"
+arbitrary = { version = "1", features = ["derive"] }
 assert_fs = "1.0.3"
+bstr = { version = "1.1.0", default-features = false, features = ["std", "alloc"] }
+libfuzzer-sys = "0.4"
 
 [dependencies.zet]
 path = ".."
@@ -19,8 +21,11 @@ path = ".."
 [workspace]
 members = ["."]
 
+[profile.release]
+debug = 1
+
 [[bin]]
-name = "zet-fuzz"
-path = "fuzz_targets/zet-fuzz.rs"
+name = "fuzz"
+path = "fuzz_targets/fuzz.rs"
 test = false
 doc = false
